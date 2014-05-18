@@ -2,19 +2,101 @@
 
 
 ## Loading and preprocessing the data
+1. Load the data
+  ```{r}
+  Sys.setlocale("LC_TIME", 'English')
+  options(scipen=999)
+  setwd('D:/Dropbox/Workshops&Courses/reproducible_research/RepData_PeerAssessment1')
+  activity <- read.csv(unz('activity.zip', 'activity.csv'))
+  ```
 
-
+2. Transform the date column to the `Date` format in R. Also make the aggregated data set. 
+  ```{r}
+  activity <- transform(activity, date = as.Date(date, format = '%Y-%m-%d'))
+  activity_agg1 <- aggregate(. ~ date, data = activity, FUN = sum)
+  ```
 
 ## What is mean total number of steps taken per day?
+1. Histogram:
+  ```{r}
+  hist(activity_agg1$steps)
+  ```
 
+  ```{r}
+  mean1 <- mean(activity_agg1$steps)
+  median1 <- median(activity_agg1$steps)
+  ```
 
+2. The mean total number of steps is `r mean1` and the median is `r median1`.
 
 ## What is the average daily activity pattern?
+1. Time series plot (again using the `aggregate` function in R)
+  ```{r}
+  activity_agg2 <- aggregate(steps ~ interval, data = activity, FUN = mean)
+  plot(steps ~ interval, data = activity_agg2, type = "l")
+  ```
 
+  ```{r}
+  activity_agg2[which.max(activity_agg2$steps), ]
+  ```
 
+2. The interval between `r int <- activity_agg2[which.max(activity_agg2$steps), "interval"]; int` and `r int + 5` contains the maximum number of steps (`r activity_agg2[which.max(activity_agg2$steps), "steps"]`)
 
 ## Imputing missing values
+  ```{r}
+  sum(!complete.cases(activity))
+  ```
 
+1. The total number of missing values is `r sum(!complete.cases(activity))`. 
 
+  ```{r}
+  matching <- function(x) {
+    count_NA <- sum(is.na(x))
+    if (count_NA > 0) {
+      imputed_values <- sample(x[!is.na(x)], count_NA, 
+                              replace = TRUE)
+      x[is.na(x)] <- imputed_values
+    }
+    return(x)
+  }
+  ```
+  
+2. I've written a simple function `matching` as above, where for each missing value, a number is randomly taken from other observations within the same 5-minute interval for imputation. 
+  
+  ```{r}
+  activity_new <- within(activity, 
+                         steps <- unlist(tapply(steps, 
+                                                interval, 
+                                                matching)))
+  ```
+3. The new dataset is `activity_new`.
+  
+4. Below shows the histogram
+
+  ```{r}
+  hist(with(activity_new, tapply(steps, date, sum)))
+  mean(with(activity_new, tapply(steps, date, sum)))
+  median(with(activity_new, tapply(steps, date, sum)))
+  ```
+
+  The mean is `r mean(with(activity_new, tapply(steps, date, sum)))` and the median is `r median(with(activity_new, tapply(steps, date, sum)))`.
+
+The total number of missing values are `r sum(!complete.cases(activity))`. The values do not differ much from the estimates in the first part. 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+1. Below is the transformed data.
+
+  ```{r}
+  activity_new <- within(activity_new, weekday <- weekdays(date))
+  activity_new <- within(activity_new, weekday <- !(weekday %in% c("Saturday", "Sunday")))
+  activity_new <- within(activity_new, weekday <- factor(weekday, labels = c("weekend", "weekday")))
+  summary(activity_new)
+  ```
+2. Below shows the plot.   
+  
+  ```{r}
+  activity_agg1_new <- aggregate(. ~ interval + weekday, data = activity_new, FUN = mean)
+  library(lattice)
+  xyplot(steps ~ interval | weekday, data = activity_agg1_new, type = "l", 
+  layout = c(1, 2), ylab = "Number of steps", xlab = "Interval")
+  ```
